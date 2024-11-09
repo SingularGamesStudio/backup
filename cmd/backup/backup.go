@@ -2,6 +2,7 @@ package backup
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"os"
@@ -49,4 +50,32 @@ func CheckJson(path string) (bool, error) {
 	} else {
 		return false, err
 	}
+}
+
+// TryAbort tries to delete everything in dir
+func TryAbort(dir string) {
+	fmt.Println("Attempting to clean up failed backup file copies...")
+	ctx, cancel := context.WithTimeout(context.Background(), time.Second*5)
+	defer cancel()
+	err := file.ClearDir(ctx, dir)
+	if err != nil {
+		fmt.Printf("Failed to abort backup (%s), files in %s must be deleted manually\n", err.Error(), dir)
+	} else {
+		fmt.Println("Backup aborted")
+	}
+}
+
+// SaveInfo saves backup metadata in .backup.json
+func SaveInfo(dir string, info Info) error {
+	file, err := os.Create(filepath.Join(dir, ".backup.json"))
+	if err != nil {
+		return err
+	}
+	defer file.Close()
+	data, err := json.Marshal(info)
+	if err != nil {
+		return err
+	}
+	_, err = file.Write(data)
+	return err
 }
