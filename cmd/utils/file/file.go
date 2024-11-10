@@ -4,10 +4,9 @@ import (
 	"context"
 	"io"
 	"os"
-	"os/user"
 	"path/filepath"
+	"reflect"
 	"runtime"
-	"strconv"
 )
 
 // ClearDir deletes directory contents
@@ -112,27 +111,17 @@ func MkdirAll(src string, dest string) error {
 
 // CopyRights copies file uid, gid, and mode
 func CopyRights(src string, dest string) error {
-	if runtime.GOOS != "windows" { //save uid/gid
-		id, err := user.Lookup(src)
-		if err != nil {
-			return err
-		}
-		gid, err := strconv.Atoi(id.Gid)
-		if err != nil {
-			return err
-		}
-		uid, err := strconv.Atoi(id.Uid)
-		if err != nil {
-			return err
-		}
-		err = os.Lchown(dest, uid, gid)
-		if err != nil {
-			return err
-		}
-	}
 	info, err := os.Lstat(src)
 	if err != nil {
 		return err
+	}
+	if runtime.GOOS != "windows" { //save uid/gid
+		gid := reflect.ValueOf(info.Sys()).FieldByName("Gid").Uint()
+		uid := reflect.ValueOf(info.Sys()).FieldByName("Uid").Uint()
+		err = os.Lchown(dest, int(uid), int(gid))
+		if err != nil {
+			return err
+		}
 	}
 	if info.Mode()&os.ModeSymlink == 0 {
 		err := os.Chmod(dest, info.Mode())
