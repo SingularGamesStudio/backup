@@ -7,6 +7,7 @@ import (
 	"log"
 	"os"
 	"strings"
+	"syscall"
 )
 
 const (
@@ -43,11 +44,13 @@ func AskForConfirmation(s string) bool {
 }
 
 // PrintError prints user-friendly error message caught in given context
-func PrintError(context string, err error) { //TODO:
+func PrintError(context string, err error) {
 	if errors.Is(err, os.ErrPermission) {
 		fmt.Println(fmt.Errorf("Permission denied in {%s}: %w", context, err))
 	} else if errors.Is(err, ErrAborted) {
 		fmt.Println(fmt.Errorf("Aborted by user in {%s}", context))
+	} else if errors.Is(err, syscall.ENOSPC) {
+		fmt.Println(fmt.Errorf("Not enough space to perform {%s}", context))
 	} else {
 		fmt.Println(fmt.Errorf("Error in {%s}: %w", context, err))
 	}
