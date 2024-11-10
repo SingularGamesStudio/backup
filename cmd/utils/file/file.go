@@ -58,13 +58,13 @@ func CopyFolder(ctx context.Context, src string, dest string) error {
 	return nil
 }
 
-// CopyFolder copies a file or symlink
+// CopyFile copies a file or symlink
 func CopyFile(src string, dest string) error {
 	stat, err := os.Lstat(src)
 	if err != nil {
 		return err
 	}
-	if stat.Mode()&os.ModeSymlink != 0 {
+	if stat.Mode()&os.ModeSymlink != 0 { // copy symbolic link
 		file, err := os.Readlink(src)
 		if err != nil {
 			return err

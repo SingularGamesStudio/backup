@@ -43,9 +43,9 @@ func Setup(ctx context.Context, path string) (string, error) {
 	return path, nil
 }
 
-// CheckJson checks whether there is .backup.json file in path
+// CheckJson checks whether there is the metadata file in path
 func CheckJson(path string) (bool, error) {
-	if _, err := os.Stat(filepath.Join(path, ".backup.json")); errors.Is(err, os.ErrNotExist) {
+	if _, err := os.Stat(filepath.Join(path, utils.Metadata)); errors.Is(err, os.ErrNotExist) {
 		return false, nil
 	} else if err == nil {
 		return true, nil
@@ -54,8 +54,9 @@ func CheckJson(path string) (bool, error) {
 	}
 }
 
+// GetJson reads metadata file from path
 func GetJson(path string) (Info, error) {
-	file, err := os.Open(filepath.Join(path, ".backup.json"))
+	file, err := os.Open(filepath.Join(path, utils.Metadata))
 	if err != nil {
 		return Info{}, err
 	}
@@ -82,9 +83,9 @@ func TryAbort(dir string) {
 	}
 }
 
-// SaveInfo saves backup metadata in .backup.json
+// SaveInfo saves backup metadata
 func SaveInfo(dir string, info Info) error {
-	file, err := os.Create(filepath.Join(dir, ".backup.json"))
+	file, err := os.Create(filepath.Join(dir, utils.Metadata))
 	if err != nil {
 		return err
 	}

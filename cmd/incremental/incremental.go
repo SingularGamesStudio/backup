@@ -9,9 +9,11 @@ import (
 	"time"
 
 	"github.com/SingularGamesStudio/backup/cmd/backup"
+	"github.com/SingularGamesStudio/backup/cmd/utils"
 	"github.com/SingularGamesStudio/backup/cmd/utils/file"
 )
 
+// latestFull gets last full backup in dir
 func latestFull(ctx context.Context, dir string) (string, error) {
 	entries, err := os.ReadDir(dir)
 	if err != nil {
@@ -53,6 +55,7 @@ func latestFull(ctx context.Context, dir string) (string, error) {
 	return res, nil
 }
 
+// saveChanged saves files that changed in new, compared with old (except deleted ones)
 func saveChanged(ctx context.Context, old string, new string, dest string) error {
 	entries, err := os.ReadDir(new)
 	if err != nil {
@@ -64,7 +67,7 @@ func saveChanged(ctx context.Context, old string, new string, dest string) error
 			return err
 		}
 		if !entry.IsDir() {
-			if change != "false" {
+			if change != "false" { // file changed
 				err = os.MkdirAll(dest, os.ModePerm)
 				if err != nil {
 					return err
@@ -76,19 +79,20 @@ func saveChanged(ctx context.Context, old string, new string, dest string) error
 			}
 			continue
 		}
-		if change != "false" {
+		if change != "false" { // directory changed
 			err = os.MkdirAll(filepath.Join(dest, entry.Name()), os.ModePerm)
 			if err != nil {
 				return err
 			}
 		}
-		if change == "new" {
+		if change == "new" { // directory created
 			err = file.CopyFolder(ctx, filepath.Join(new, entry.Name()), filepath.Join(dest, entry.Name()))
 			if err != nil {
 				return err
 			}
 			continue
 		}
+		// directory contents might be changed
 		err = saveChanged(ctx, filepath.Join(old, entry.Name()), filepath.Join(new, entry.Name()), filepath.Join(dest, entry.Name()))
 		if err != nil {
 			return err
@@ -102,16 +106,17 @@ func saveChanged(ctx context.Context, old string, new string, dest string) error
 	return nil
 }
 
-func saveDeleted(ctx context.Context, old string, new string, dest string) error {
+// saveDeleted saves files that were deleted in new, compared with old
+func saveDeleted(ctx context.Context, old string, new string, dest string, root bool) error {
 	entries, err := os.ReadDir(old)
 	if err != nil {
 		return err
 	}
 	for _, entry := range entries {
-		if entry.Name() == ".backup.json" { //TODO:only in root
+		if root && entry.Name() == utils.Metadata { //.backup.json is considered deleted, but it is not
 			continue
 		}
-		change, err := changed(entry, new, old)
+		change, err := changed(entry, new, old) //reversed argument order, so "new" would mean that file was deleted
 		if err != nil {
 			return err
 		}
@@ -120,7 +125,7 @@ func saveDeleted(ctx context.Context, old string, new string, dest string) error
 			if err != nil {
 				return err
 			}
-			file, err := os.Create(filepath.Join(dest, entry.Name()+".deleted")) //TODO:check for such
+			file, err := os.Create(filepath.Join(dest, entry.Name()+utils.DeletedExt))
 			if err != nil {
 				return err
 			}
@@ -128,7 +133,7 @@ func saveDeleted(ctx context.Context, old string, new string, dest string) error
 			continue
 		}
 		if entry.IsDir() {
-			err = saveDeleted(ctx, filepath.Join(old, entry.Name()), filepath.Join(new, entry.Name()), filepath.Join(dest, entry.Name()))
+			err = saveDeleted(ctx, filepath.Join(old, entry.Name()), filepath.Join(new, entry.Name()), filepath.Join(dest, entry.Name()), false)
 			if err != nil {
 				return err
 			}
@@ -142,6 +147,7 @@ func saveDeleted(ctx context.Context, old string, new string, dest string) error
 	return nil
 }
 
+// changed returns how entry was changed in new, compared to old ("new" - created, "true" - modified, "false" - no change)
 func changed(entry fs.DirEntry, old string, new string) (string, error) {
 	oldStat, err := os.Lstat(filepath.Join(old, entry.Name()))
 	if errors.Is(err, os.ErrNotExist) {

@@ -36,10 +36,10 @@ func Restore(ctx context.Context, dir string, backupDir string) error {
 		return err
 	}
 	fmt.Println("Deleting backup metadata...")
-	err = os.Remove(filepath.Join(dir, ".backup.json"))
+	err = os.Remove(filepath.Join(dir, utils.Metadata))
 	if err != nil {
 		utils.PrintError("Deleting backup metadata", err)
-		fmt.Println("Restore successful, but file .backup.json failed to be deleted, consider deleting it manually")
+		fmt.Printf("Restore successful, but file %s failed to be deleted, consider deleting it manually\n", utils.Metadata)
 		return err
 	}
 	fmt.Println("Restore successful")

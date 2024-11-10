@@ -17,12 +17,12 @@ func Backup(ctx context.Context, dir string, targetDir string) {
 	}
 	found, err := backup.CheckJson(dir)
 	if err == nil && found {
-		if !utils.AskForConfirmation(".backup.json found in source directory, it will be deleted in backup. Proceed?") {
+		if !utils.AskForConfirmation(fmt.Sprintf("%s found in source directory, it will be deleted in backup. Proceed?", utils.Metadata)) {
 			err = utils.ErrAborted
 		}
 	}
 	if err != nil {
-		utils.PrintError("checking for .backup.json in source", err)
+		utils.PrintError(fmt.Sprintf("checking for %s in source", utils.Metadata), err)
 		return
 	}
 	fmt.Println("Looking for latest full backup...")
@@ -39,7 +39,7 @@ func Backup(ctx context.Context, dir string, targetDir string) {
 		return
 	}
 	fmt.Println("Saving info about deleted files...")
-	err = saveDeleted(ctx, base, dir, backupDir)
+	err = saveDeleted(ctx, base, dir, backupDir, true)
 	if err != nil {
 		utils.PrintError("calculating and saving diff (deleted files)", err)
 		backup.TryAbort(backupDir)

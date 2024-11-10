@@ -11,6 +11,7 @@ import (
 	"github.com/SingularGamesStudio/backup/cmd/backup"
 	"github.com/SingularGamesStudio/backup/cmd/full"
 	"github.com/SingularGamesStudio/backup/cmd/incremental"
+	"github.com/SingularGamesStudio/backup/cmd/utils"
 )
 
 func main() {
@@ -18,7 +19,7 @@ func main() {
 	dir := os.Args[2]
 	info, err := backup.GetJson(backupDir)
 	if err != nil {
-		print("Failed to read %s: %s", filepath.Join(backupDir, ".backup.json"), err.Error())
+		print("Failed to read %s: %s", filepath.Join(backupDir, utils.Metadata), err.Error())
 	}
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
@@ -30,7 +31,7 @@ func main() {
 		case "incremental":
 			incremental.Restore(ctx, dir, backupDir, filepath.Join(filepath.Dir(backupDir), info.Base))
 		default:
-			fmt.Printf("Error: unknown backup type in %s: %s, supported types are incremental and full", filepath.Join(backupDir, ".backup.json"), info.Type)
+			fmt.Printf("Error: unknown backup type in %s: %s, supported types are incremental and full", filepath.Join(backupDir, utils.Metadata), info.Type)
 		}
 		done <- true
 	}()

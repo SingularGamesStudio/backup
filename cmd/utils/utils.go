@@ -9,6 +9,11 @@ import (
 	"strings"
 )
 
+const (
+	Metadata   = ".backup.json"
+	DeletedExt = ".deleted"
+)
+
 var ErrAborted = errors.New("Backup aborted by user")
 
 // AskForConfirmation creates a yes/no prompt for the user
@@ -32,7 +37,7 @@ func AskForConfirmation(s string) bool {
 }
 
 // PrintError prints user-friendly error message caught in given context
-func PrintError(context string, err error) {
+func PrintError(context string, err error) { //TODO:
 	if errors.Is(err, os.ErrPermission) {
 		fmt.Println(fmt.Errorf("Permission denied in {%s}: %w", context, err))
 	} else if errors.Is(err, ErrAborted) {

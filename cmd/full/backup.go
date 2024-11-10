@@ -17,12 +17,12 @@ func Backup(ctx context.Context, dir string, targetDir string) {
 	}
 	found, err := backup.CheckJson(dir)
 	if err == nil && found {
-		if !utils.AskForConfirmation(".backup.json found in source directory, it will be deleted in backup. Proceed?") {
+		if !utils.AskForConfirmation(fmt.Sprintf("%s found in source directory, it will be deleted in backup. Proceed?", utils.Metadata)) {
 			err = utils.ErrAborted
 		}
 	}
 	if err != nil {
-		utils.PrintError("checking for .backup.json in source", err)
+		utils.PrintError(fmt.Sprintf("checking for %s in source", utils.Metadata), err)
 		return
 	}
 	fmt.Println("Copying data...")
