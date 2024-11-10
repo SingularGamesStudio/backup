@@ -2,35 +2,163 @@ package incremental
 
 import (
 	"context"
-	"fmt"
+	"errors"
+	"io/fs"
+	"os"
+	"path/filepath"
+	"time"
 
 	"github.com/SingularGamesStudio/backup/cmd/backup"
-	"github.com/SingularGamesStudio/backup/cmd/utils"
+	"github.com/SingularGamesStudio/backup/cmd/utils/file"
 )
 
-func Backup(ctx context.Context, dir string, targetDir string) {
-	backupDir, err := backup.Setup(ctx, targetDir)
+func latestFull(ctx context.Context, dir string) (string, error) {
+	entries, err := os.ReadDir(dir)
 	if err != nil {
-		utils.PrintError("setting up backup folder", err)
-		return
+		return "", err
 	}
-	found, err := backup.CheckJson(dir)
-	if err == nil && found {
-		if !utils.AskForConfirmation(".backup.json found in source directory, it will be deleted in backup. Proceed?") {
-			err = utils.ErrAborted
+	latest := time.Time{}
+	res := ""
+	for _, entry := range entries {
+		if entry.IsDir() {
+			when, err := time.Parse("2006-01-02_15-04-05", entry.Name())
+			if err != nil {
+				continue
+			}
+			if !latest.IsZero() && latest.After(when) {
+				continue
+			}
+			exists, err := backup.CheckJson(filepath.Join(dir, entry.Name()))
+			if err != nil || !exists {
+				continue
+			}
+			info, err := backup.GetJson(filepath.Join(dir, entry.Name()))
+			if err != nil {
+				continue
+			}
+			if info.Type == "full" {
+				latest = when
+				res = filepath.Join(dir, entry.Name())
+			}
+		}
+		select {
+		case <-ctx.Done():
+			return "", ctx.Err()
+		default:
 		}
 	}
-	if err != nil {
-		utils.PrintError("checking for .backup.json in source", err)
-		return
+	if res == "" {
+		return "", errors.New("no valid full backup found")
 	}
-	//TODO:
-	fmt.Println("Saving backup metadata...")
-	err = backup.SaveInfo(backupDir, backup.Info{})
+	return res, nil
+}
+
+func saveChanged(ctx context.Context, old string, new string, dest string) error {
+	entries, err := os.ReadDir(new)
 	if err != nil {
-		utils.PrintError("saving backup metadata", err)
-		backup.TryAbort(backupDir)
-		return
+		return err
 	}
-	fmt.Println("Backup successful")
+	for _, entry := range entries {
+		change, err := changed(entry, old, new)
+		if err != nil {
+			return err
+		}
+		if !entry.IsDir() {
+			if change != "false" {
+				err = os.MkdirAll(dest, os.ModePerm)
+				if err != nil {
+					return err
+				}
+				err = file.CopyFile(filepath.Join(new, entry.Name()), filepath.Join(dest, entry.Name()))
+				if err != nil {
+					return err
+				}
+			}
+			continue
+		}
+		if change != "false" {
+			err = os.MkdirAll(filepath.Join(dest, entry.Name()), os.ModePerm)
+			if err != nil {
+				return err
+			}
+		}
+		if change == "new" {
+			err = file.CopyFolder(ctx, filepath.Join(new, entry.Name()), filepath.Join(dest, entry.Name()))
+			if err != nil {
+				return err
+			}
+			continue
+		}
+		err = saveChanged(ctx, filepath.Join(old, entry.Name()), filepath.Join(new, entry.Name()), filepath.Join(dest, entry.Name()))
+		if err != nil {
+			return err
+		}
+		select {
+		case <-ctx.Done():
+			return ctx.Err()
+		default:
+		}
+	}
+	return nil
+}
+
+func saveDeleted(ctx context.Context, old string, new string, dest string) error {
+	entries, err := os.ReadDir(old)
+	if err != nil {
+		return err
+	}
+	for _, entry := range entries {
+		if entry.Name() == ".backup.json" { //TODO:only in root
+			continue
+		}
+		change, err := changed(entry, new, old)
+		if err != nil {
+			return err
+		}
+		if change == "new" {
+			err = os.MkdirAll(dest, os.ModePerm)
+			if err != nil {
+				return err
+			}
+			file, err := os.Create(filepath.Join(dest, entry.Name()+".deleted")) //TODO:check for such
+			if err != nil {
+				return err
+			}
+			file.Close()
+			continue
+		}
+		if entry.IsDir() {
+			err = saveDeleted(ctx, filepath.Join(old, entry.Name()), filepath.Join(new, entry.Name()), filepath.Join(dest, entry.Name()))
+			if err != nil {
+				return err
+			}
+		}
+		select {
+		case <-ctx.Done():
+			return ctx.Err()
+		default:
+		}
+	}
+	return nil
+}
+
+func changed(entry fs.DirEntry, old string, new string) (string, error) {
+	oldStat, err := os.Lstat(filepath.Join(old, entry.Name()))
+	if errors.Is(err, os.ErrNotExist) {
+		return "new", nil
+	}
+	if err != nil {
+		return "", err
+	}
+	newStat, err := os.Lstat(filepath.Join(new, entry.Name()))
+	if err != nil {
+		return "", err
+	}
+	if !newStat.ModTime().After(oldStat.ModTime()) {
+		return "false", nil
+	}
+	if newStat.Size() != oldStat.Size() || entry.IsDir() {
+		return "true", nil
+	}
+	return "false", nil
 }

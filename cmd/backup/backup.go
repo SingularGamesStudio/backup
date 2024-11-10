@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"io"
 	"os"
 	"path/filepath"
 	"time"
@@ -15,6 +16,7 @@ import (
 
 type Info struct {
 	Type string `json:"Type"`
+	Base string `json:"Base"`
 }
 
 // Setup creates path, and asks user to delete everything inside
@@ -50,6 +52,21 @@ func CheckJson(path string) (bool, error) {
 	} else {
 		return false, err
 	}
+}
+
+func GetJson(path string) (Info, error) {
+	file, err := os.Open(filepath.Join(path, ".backup.json"))
+	if err != nil {
+		return Info{}, err
+	}
+	defer file.Close()
+	data, err := io.ReadAll(file)
+	if err != nil {
+		return Info{}, err
+	}
+	res := Info{}
+	err = json.Unmarshal(data, &res)
+	return res, err
 }
 
 // TryAbort tries to delete everything in dir
