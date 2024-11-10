@@ -116,8 +116,8 @@ func CopyRights(src string, dest string) error {
 		return err
 	}
 	if runtime.GOOS != "windows" { //save uid/gid
-		gid := reflect.ValueOf(info.Sys()).FieldByName("Gid").Uint()
-		uid := reflect.ValueOf(info.Sys()).FieldByName("Uid").Uint()
+		gid := reflect.ValueOf(info.Sys()).Elem().FieldByName("Gid").Uint()
+		uid := reflect.ValueOf(info.Sys()).Elem().FieldByName("Uid").Uint()
 		err = os.Lchown(dest, int(uid), int(gid))
 		if err != nil {
 			return err
