@@ -13,8 +13,8 @@ import (
 	"github.com/SingularGamesStudio/backup/cmd/utils/file"
 )
 
-// latestFull gets last full backup in dir
-func latestFull(ctx context.Context, dir string) (string, error) {
+// Latest gets last <full> backup in dir
+func Latest(ctx context.Context, dir string, full bool) (string, error) {
 	entries, err := os.ReadDir(dir)
 	if err != nil {
 		return "", err
@@ -38,7 +38,7 @@ func latestFull(ctx context.Context, dir string) (string, error) {
 			if err != nil {
 				continue
 			}
-			if info.Type == "full" {
+			if (info.Type == "full" && full) || (info.Type == "incremental" && !full) {
 				latest = when
 				res = filepath.Join(dir, entry.Name())
 			}
@@ -50,7 +50,7 @@ func latestFull(ctx context.Context, dir string) (string, error) {
 		}
 	}
 	if res == "" {
-		return "", errors.New("no valid full backup found")
+		return "", errors.New("no valid backup found")
 	}
 	return res, nil
 }
@@ -68,7 +68,7 @@ func saveChanged(ctx context.Context, old string, new string, dest string) error
 		}
 		if !entry.IsDir() {
 			if change != "false" { // file changed
-				err = os.MkdirAll(dest, os.ModePerm)
+				err = file.MkdirAll(new, dest)
 				if err != nil {
 					return err
 				}
@@ -80,7 +80,7 @@ func saveChanged(ctx context.Context, old string, new string, dest string) error
 			continue
 		}
 		if change != "false" { // directory changed
-			err = os.MkdirAll(filepath.Join(dest, entry.Name()), os.ModePerm)
+			err = file.MkdirAll(filepath.Join(new, entry.Name()), filepath.Join(dest, entry.Name()))
 			if err != nil {
 				return err
 			}
@@ -121,7 +121,7 @@ func saveDeleted(ctx context.Context, old string, new string, dest string, root 
 			return err
 		}
 		if change == "new" {
-			err = os.MkdirAll(dest, os.ModePerm)
+			err = file.MkdirAll(old, dest)
 			if err != nil {
 				return err
 			}

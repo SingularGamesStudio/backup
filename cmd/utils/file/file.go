@@ -4,7 +4,10 @@ import (
 	"context"
 	"io"
 	"os"
+	"os/user"
 	"path/filepath"
+	"runtime"
+	"strconv"
 )
 
 // ClearDir deletes directory contents
@@ -41,14 +44,14 @@ func CopyFolder(ctx context.Context, src string, dest string) error {
 			}
 			continue
 		}
-		err = os.MkdirAll(filepath.Join(dest, entry.Name()), os.ModePerm)
+		err = MkdirAll(filepath.Join(src, entry.Name()), filepath.Join(dest, entry.Name()))
 		if err != nil {
 			return err
 		}
 		err = CopyFolder(ctx, filepath.Join(src, entry.Name()), filepath.Join(dest, entry.Name()))
 		if err != nil {
 			return err
-		} //TODO:copy ownership
+		}
 		select {
 		case <-ctx.Done():
 			return ctx.Err()
@@ -69,7 +72,11 @@ func CopyFile(src string, dest string) error {
 		if err != nil {
 			return err
 		}
-		return os.Symlink(file, dest)
+		err = os.Symlink(file, dest)
+		if err != nil {
+			return err
+		}
+		return CopyRights(src, dest)
 	}
 
 	from, err := os.Open(src)
@@ -84,5 +91,54 @@ func CopyFile(src string, dest string) error {
 	defer to.Close()
 
 	_, err = io.Copy(to, from)
-	return err
+	if err != nil {
+		return err
+	}
+	return CopyRights(src, dest)
+}
+
+// MkdirAll calls os.MkdirAll(dest) with mode from src
+func MkdirAll(src string, dest string) error {
+	info, err := os.Lstat(src)
+	if err != nil {
+		return err
+	}
+	err = os.MkdirAll(dest, info.Mode())
+	if err != nil {
+		return err
+	}
+	return CopyRights(src, dest)
+}
+
+// CopyRights copies file uid, gid, and mode
+func CopyRights(src string, dest string) error {
+	if runtime.GOOS != "windows" { //save uid/gid
+		id, err := user.Lookup(src)
+		if err != nil {
+			return err
+		}
+		gid, err := strconv.Atoi(id.Gid)
+		if err != nil {
+			return err
+		}
+		uid, err := strconv.Atoi(id.Uid)
+		if err != nil {
+			return err
+		}
+		err = os.Lchown(dest, uid, gid)
+		if err != nil {
+			return err
+		}
+	}
+	info, err := os.Lstat(src)
+	if err != nil {
+		return err
+	}
+	if info.Mode()&os.ModeSymlink == 0 {
+		err := os.Chmod(dest, info.Mode())
+		if err != nil {
+			return err
+		}
+	}
+	return nil
 }

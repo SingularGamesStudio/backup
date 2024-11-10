@@ -54,7 +54,7 @@ func applyChanged(ctx context.Context, src string, dest string) error {
 			}
 			continue
 		}
-		err = os.MkdirAll(filepath.Join(dest, entry.Name()), os.ModePerm) //directory changed
+		err = file.MkdirAll(filepath.Join(src, entry.Name()), filepath.Join(dest, entry.Name())) //directory changed
 		if err != nil {
 			return err
 		}

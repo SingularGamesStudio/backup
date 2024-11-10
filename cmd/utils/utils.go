@@ -16,8 +16,14 @@ const (
 
 var ErrAborted = errors.New("Backup aborted by user")
 
+// Yes returns true for any prompts
+var Yes = false
+
 // AskForConfirmation creates a yes/no prompt for the user
 func AskForConfirmation(s string) bool {
+	if Yes {
+		return true
+	}
 	reader := bufio.NewReader(os.Stdin)
 	for {
 		fmt.Printf("%s [y/n]: ", s)
